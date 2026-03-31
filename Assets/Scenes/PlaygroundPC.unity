@@ -501,12 +501,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   nodePrefab: {fileID: 7111342095737244422, guid: aea5818f710253e41a10d30e4bcd5a23, type: 3}
   grid: {fileID: 1202113207}
-  nodesPerSpread: 2
-  baseSpreadCost: 5
+  baseSpreadCost: 15
+  baseActivationCost: 5
   lineMaterial: {fileID: 2100000, guid: f3045a30f5491b145b0f22c65b0809ce, type: 2}
   activeLineMaterial: {fileID: 2100000, guid: 4870d77d848302e4fa1b4b65be555263, type: 2}
   lineWidth: 0.05
   playerResources: {fileID: 1589644850}
+  rootNode: {fileID: 0}
 --- !u!4 &1202113206
 Transform:
   m_ObjectHideFlags: 0
@@ -748,7 +749,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 06150f6db53133b4e8c9838bf6d3fdc6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentPoints: 999
+  currentPoints: 25
 --- !u!4 &1589644851
 Transform:
   m_ObjectHideFlags: 0

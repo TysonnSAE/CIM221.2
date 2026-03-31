@@ -10,7 +10,7 @@ public class PointsUI : MonoBehaviour
     {
         if (playerResources != null && pointsText != null)
         {
-            pointsText.text = "Growth Points: " + playerResources.currentPoints;
+            pointsText.text = "Growth Points: " + Mathf.RoundToInt(playerResources.currentPoints).ToString();
         }
     }
 }

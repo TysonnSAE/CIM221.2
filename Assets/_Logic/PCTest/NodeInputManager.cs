@@ -26,33 +26,28 @@ public class NodeInputManager : MonoBehaviour
 
     private void OnClick(InputAction.CallbackContext context)
     {
-        // Raycast from mouse position
         Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
             Node node = hit.collider.GetComponent<Node>();
             if (node != null)
             {
-                // Attempt to activate/spread this node
-                growthSystem.TrySpread(node);
-                node.isActiveForPoints = true;
-                node.isActiveForSpreading = true;
-
-                // Optional visual feedback for selection
-                Renderer rend = node.GetComponentInChildren<Renderer>();
-                if (rend != null && node.isActive)
+                if (!node.isActive)
                 {
-                    rend.material.color = Color.green;
+                    growthSystem.TryActivateNode(node);
+                }
+                else if (!node.isActiveForSpreading)
+                {
+                    growthSystem.TrySpread(node);
                 }
 
-                Debug.Log($"Clicked Node (Depth: {node.depth}, Active: {node.isActive})");
+                Debug.Log($"Clicked Node (Depth: {node.depth}, Active: {node.isActive}, CanSpread: {!node.isActiveForSpreading})");
             }
         }
     }
 
     private void OnDrawGizmos()
     {
-        // Optional: visualize mouse ray in editor
         if (Mouse.current != null && mainCamera != null)
         {
             Ray ray = mainCamera.ScreenPointToRay(Mouse.current.position.ReadValue());

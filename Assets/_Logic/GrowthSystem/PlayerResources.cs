@@ -1,11 +1,10 @@
 using UnityEngine;
 
-[System.Serializable]
 public class PlayerResources : MonoBehaviour
 {
-    public int currentPoints = 100;
+    public float currentPoints = 50f;
 
-    public bool SpendPoints(int amount)
+    public bool SpendPoints(float amount)
     {
         if (currentPoints >= amount)
         {

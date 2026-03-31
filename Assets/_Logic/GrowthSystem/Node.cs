@@ -1,5 +1,6 @@
-using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 
 public enum NodeEfficiency
 {
@@ -13,84 +14,126 @@ public class Node : MonoBehaviour
     [HideInInspector] public Node parentNode;
     public List<Node> childNodes = new List<Node>();
 
-    [HideInInspector] public int depth = 0;
     public bool isActive = false;
-    public NodeEfficiency efficiencyType = NodeEfficiency.ShortTerm;
-
-    private float baseProduction;
-    private float elapsedTime = 0f;
-    private float pointAccumulator = 0f;
-
-    [Header("Scale Animation")]
-    public float minScale = 0.8f;
-    public float maxScale = 1.6f;
-    private Vector3 baseScale;
     public bool isActiveForPoints = false;
     public bool isActiveForSpreading = false;
 
+    public NodeEfficiency efficiencyType;
+
+    private float baseProduction;
+    private float elapsedTime = 0f;
+    private float storedPoints = 0f;
+    private float sendTimer = 0f;
+
+    private Vector3 originalScale;
+
+    public int depth = 0;
+
     private void Start()
     {
-        baseScale = transform.localScale;
+        originalScale = transform.localScale;
 
         switch (efficiencyType)
         {
             case NodeEfficiency.ShortTerm:
-                baseProduction = Random.Range(5f, 10f);
-                GetComponentInChildren<Renderer>().material.color = Color.red;
+                baseProduction = Random.Range(5f, 8f);
                 break;
+
             case NodeEfficiency.LongTerm:
-                baseProduction = Random.Range(1f, 3f);
-                GetComponentInChildren<Renderer>().material.color = Color.blue;
+                baseProduction = Random.Range(1f, 4f);
                 break;
         }
     }
 
     private void Update()
     {
-        if (!isActiveForPoints || growthSystem == null)
-        {
-            return;
-        }
+        if (!isActiveForPoints) return;
 
         elapsedTime += Time.deltaTime;
+        sendTimer += Time.deltaTime;
 
-        float production = 0f;
+        float production = CalculateProduction();
+        storedPoints += production * Time.deltaTime;
+
+        if (sendTimer >= 1f)
+        {
+            PushPointsUpstream();
+            sendTimer = 0f;
+            StartCoroutine(Anim());
+        }
+    }
+
+    float CalculateProduction()
+    {
         switch (efficiencyType)
         {
             case NodeEfficiency.ShortTerm:
-                production = baseProduction * Mathf.Exp(-elapsedTime * 0.05f);
-                break;
+                return baseProduction * Mathf.Exp(-elapsedTime * 0.05f);
+
             case NodeEfficiency.LongTerm:
-                production = baseProduction * (1 + elapsedTime * 0.01f);
-                break;
+                return baseProduction * (1 + elapsedTime * 0.02f);
         }
 
-        pointAccumulator += production * Time.deltaTime;
+        return 0f;
+    }
 
-        float drainFactor = 0.2f;
-        float pointsToPass = pointAccumulator * (1 - drainFactor);
-        pointAccumulator *= drainFactor;
+    void PushPointsUpstream()
+    {
+        if (storedPoints <= 0f) return;
 
-        if (parentNode != null && parentNode.isActiveForPoints)
+        if (parentNode != null)
         {
-            parentNode.ReceivePoints(pointsToPass);
+            float efficiency = 0.9f;
+            parentNode.ReceivePoints(storedPoints * efficiency);
         }
         else
         {
-            growthSystem.AddPoints(Mathf.FloorToInt(pointsToPass));
+            growthSystem.AddPoints(storedPoints);
         }
 
-        float scaleFactor = minScale + (maxScale - minScale) * Mathf.Clamp(production / 10f, 0f, 1f);
-        transform.localScale = baseScale * scaleFactor;
+        storedPoints = 0f;
     }
 
-    public void ReceivePoints(float points)
+    public void ReceivePoints(float amount)
     {
-        if (!isActiveForPoints)
+        storedPoints += amount;
+    }
+
+    private void OnMouseDown()
+    {
+        if (!isActive)
         {
-            return;
+            growthSystem.TryActivateNode(this);
         }
-        
-        pointAccumulator += points;
+        else if (!isActiveForSpreading)
+        {
+            growthSystem.TrySpread(this);
+        }
+    }
+
+    private IEnumerator Anim()
+    {
+        float duration = 0.2f;
+        float scaleFactor = 1.3f;
+
+        Vector3 targetScale = originalScale * scaleFactor;
+        float timer = 0f;
+
+        while (timer < duration)
+        {
+            transform.localScale = Vector3.Lerp(originalScale, targetScale, timer / duration);
+            timer += Time.deltaTime;
+            yield return null;
+        }
+        transform.localScale = targetScale;
+
+        timer = 0f;
+        while (timer < duration)
+        {
+            transform.localScale = Vector3.Lerp(targetScale, originalScale, timer / duration);
+            timer += Time.deltaTime;
+            yield return null;
+        }
+        transform.localScale = originalScale;
     }
 }

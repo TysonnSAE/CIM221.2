@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UnityEditor.Experimental.GraphView;
 using UnityEngine;
 
 public class NodeGrowthSystem : MonoBehaviour
@@ -6,8 +7,8 @@ public class NodeGrowthSystem : MonoBehaviour
     [Header("Node Settings")]
     public GameObject nodePrefab;
     public Grid grid;
-    public int nodesPerSpread = 2;
     public int baseSpreadCost = 5;
+    public int baseActivationCost = 3;
 
     [Header("Line Settings")]
     public Material lineMaterial;
@@ -20,67 +21,69 @@ public class NodeGrowthSystem : MonoBehaviour
     private HashSet<Vector3Int> occupiedCells = new HashSet<Vector3Int>();
     private List<NodeConnection> connections = new List<NodeConnection>();
 
+    public Node rootNode;
+
     private void Start()
     {
-        Node centralNode = InitializeCentralNode(Vector3Int.zero);
+        rootNode = InitializeCentralNode(Vector3Int.zero);
 
-        centralNode.isActiveForPoints = true;
-        centralNode.isActiveForSpreading = false;
-
-        Renderer rend = centralNode.GetComponentInChildren<Renderer>();
-        if (rend != null)
-        {
-            rend.material.color = Color.gray;
-        }
+        rootNode.isActive = true;
+        rootNode.isActiveForPoints = true;
+        rootNode.isActiveForSpreading = false;
+        TrySpread(rootNode);
     }
 
     public Node InitializeCentralNode(Vector3Int gridPos)
     {
         Vector3 worldPos = grid.GetCellCenterWorld(gridPos);
-        GameObject centralNodeGO = Instantiate(nodePrefab, worldPos, Quaternion.identity);
-        Node centralNode = centralNodeGO.GetComponent<Node>();
-        centralNode.isActive = false;
-        centralNode.depth = 0;
-        centralNode.growthSystem = this;
-        centralNode.parentNode = null;
+        GameObject go = Instantiate(nodePrefab, worldPos, Quaternion.identity);
+
+        Node node = go.GetComponent<Node>();
+        node.isActive = true;
+        node.isActiveForPoints = true;
+        node.isActiveForSpreading = false;
+        node.depth = 0;
+        node.growthSystem = this;
+
+
 
         occupiedCells.Add(gridPos);
 
-        Renderer rend = centralNodeGO.GetComponentInChildren<Renderer>();
-        if (rend != null)
+        SetColor(go, Color.gray);
+
+        return node;
+    }
+
+    public void TryActivateNode(Node node)
+    {
+        if (node.isActive) return;
+
+        int cost = Mathf.RoundToInt(baseActivationCost * (1 + node.depth * 0.15f));
+
+        if (!playerResources.SpendPoints(cost))
         {
-            rend.material.color = Color.gray;
+            Debug.Log($"Not enough points! Need: {cost}");
+            return;
         }
 
-        return centralNode;
+        ActivateNode(node);
+        UpdateConnectionMaterials();
     }
 
     public void TrySpread(Node node)
     {
-        if (node.isActiveForSpreading)
+        if (!node.isActive || node.isActiveForSpreading) return;
+
+        int cost = Mathf.RoundToInt(baseSpreadCost * (1 + node.depth * 0.2f));
+
+        if (!playerResources.SpendPoints(cost))
         {
-#if UNITY_EDITOR
-            Debug.Log("Node already active for spreading!");
-#endif
+            Debug.Log($"Not enough points! Need: {cost}");
             return;
         }
 
-        int dynamicCost = Mathf.RoundToInt(baseSpreadCost * (1 + node.depth * 0.2f));
-        if (!playerResources.SpendPoints(dynamicCost))
-        {
-            Debug.Log($"Not enough points to spread! Cost: {dynamicCost}");
-            return;
-        }
-
-        node.isActive = true;
         node.isActiveForSpreading = true;
-        node.isActiveForPoints = true;
-
-        Renderer rend = node.GetComponentInChildren<Renderer>();
-        if (rend != null)
-        {
-            rend.material.color = Color.green;
-        }
+        SetColor(node.gameObject, Color.green);
 
         SpawnNewNodes(node);
         UpdateConnectionMaterials();
@@ -90,86 +93,101 @@ public class NodeGrowthSystem : MonoBehaviour
     {
         Vector3Int baseCell = grid.WorldToCell(baseNode.transform.position);
 
-        Vector3Int[] neighborOffsets = new Vector3Int[]
+        Vector3Int[] offsets =
         {
-            new Vector3Int(1,0,0),
-            new Vector3Int(-1,0,0),
-            new Vector3Int(0,0,1),
-            new Vector3Int(0,0,-1),
-            new Vector3Int(1,0,1),
-            new Vector3Int(1,0,-1),
-            new Vector3Int(-1,0,1),
-            new Vector3Int(-1,0,-1),
+            new Vector3Int(1,0,0), new Vector3Int(-1,0,0),
+            new Vector3Int(0,0,1), new Vector3Int(0,0,-1),
+            new Vector3Int(1,0,1), new Vector3Int(1,0,-1),
+            new Vector3Int(-1,0,1), new Vector3Int(-1,0,-1),
         };
 
         List<Vector3Int> freeCells = new List<Vector3Int>();
-        foreach (var offset in neighborOffsets)
+
+        foreach (var offset in offsets)
         {
-            Vector3Int neighbor = baseCell + offset;
-            if (!occupiedCells.Contains(neighbor))
-            {
-                freeCells.Add(neighbor);
-            }
+            Vector3Int pos = baseCell + offset;
+            if (!occupiedCells.Contains(pos))
+                freeCells.Add(pos);
         }
 
-        if (freeCells.Count == 0)
-        {
-            Debug.Log("No free neighboring cells to spawn new nodes.");
-            return;
-        }
+        if (freeCells.Count == 0) return;
 
-        int nodesToSpawn = Mathf.Min(nodesPerSpread, freeCells.Count);
+        int spawnCount = Mathf.Min(Random.Range(1, 3), freeCells.Count);
 
-        for (int i = 0; i < nodesToSpawn; i++)
+        for (int i = 0; i < spawnCount; i++)
         {
             int index = Random.Range(0, freeCells.Count);
-            Vector3Int cellToSpawn = freeCells[index];
+            Vector3Int cell = freeCells[index];
             freeCells.RemoveAt(index);
 
-            Vector3 worldPos = grid.GetCellCenterWorld(cellToSpawn);
-            GameObject newNodeGO = Instantiate(nodePrefab, worldPos, Quaternion.identity);
-            Node newNode = newNodeGO.GetComponent<Node>();
+            Vector3 worldPos = grid.GetCellCenterWorld(cell);
+            GameObject go = Instantiate(nodePrefab, worldPos, Quaternion.identity);
+
+            Node newNode = go.GetComponent<Node>();
             newNode.isActive = false;
             newNode.growthSystem = this;
             newNode.parentNode = baseNode;
             newNode.depth = baseNode.depth + 1;
+
             baseNode.childNodes.Add(newNode);
 
-            newNode.efficiencyType = (Random.value < 0.5f) ? NodeEfficiency.ShortTerm : NodeEfficiency.LongTerm;
+            newNode.efficiencyType = (Random.value < 0.5f)
+                ? NodeEfficiency.ShortTerm
+                : NodeEfficiency.LongTerm;
 
-            occupiedCells.Add(cellToSpawn);
+            occupiedCells.Add(cell);
 
-            Renderer rend = newNodeGO.GetComponentInChildren<Renderer>();
-            if (rend != null)
-            {
-                rend.material.color = (newNode.efficiencyType == NodeEfficiency.ShortTerm) ? Color.red : Color.blue;
-            }
+            SetColor(go,
+                newNode.efficiencyType == NodeEfficiency.ShortTerm
+                ? Color.red
+                : Color.blue);
 
-            GameObject lineGO = new GameObject("ConnectionLine");
-            LineRenderer lr = lineGO.AddComponent<LineRenderer>();
-            lr.material = lineMaterial;
-            lr.widthMultiplier = lineWidth;
-            lr.positionCount = 2;
-            lr.SetPosition(0, baseNode.transform.position + Vector3.up * 0.1f);
-            lr.SetPosition(1, newNode.transform.position + Vector3.up * 0.1f);
-            lr.useWorldSpace = true;
-
-            connections.Add(new NodeConnection
-            {
-                parentNode = baseNode, childNode = newNode, lineRenderer = lr} );
-            }
+            CreateConnection(baseNode, newNode);
+        }
     }
 
-    public void AddPoints(int amount)
+    private void CreateConnection(Node parent, Node child)
+    {
+        GameObject lineGO = new GameObject("ConnectionLine");
+        LineRenderer lr = lineGO.AddComponent<LineRenderer>();
+
+        lr.material = lineMaterial;
+        lr.widthMultiplier = lineWidth;
+        lr.positionCount = 2;
+
+        lr.SetPosition(0, parent.transform.position + Vector3.up * 0.1f);
+        lr.SetPosition(1, child.transform.position + Vector3.up * 0.1f);
+
+        connections.Add(new NodeConnection
+        {
+            parentNode = parent,
+            childNode = child,
+            lineRenderer = lr
+        });
+    }
+
+    public void ActivateNode(Node node)
+    {
+        node.isActive = true;
+        node.isActiveForPoints = true;
+
+        SetColor(node.gameObject, Color.yellow);
+    }
+
+    public void AddPoints(float amount)
     {
         playerResources.currentPoints += amount;
     }
 
     private void UpdateConnectionMaterials()
     {
-        foreach (var conn in connections)
-        {
-            conn.UpdateMaterial(lineMaterial, activeLineMaterial);
-        }
+        foreach (var c in connections)
+            c.UpdateMaterial(lineMaterial, activeLineMaterial);
+    }
+
+    private void SetColor(GameObject obj, Color color)
+    {
+        Renderer r = obj.GetComponentInChildren<Renderer>();
+        if (r != null) r.material.color = color;
     }
 }
