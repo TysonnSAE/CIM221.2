@@ -25,7 +25,7 @@ public class Node : MonoBehaviour
     public float minScale = 0.8f;
     public float maxScale = 1.6f;
     private Vector3 baseScale;
-    public bool isActiveForPoints = false;    // produces points
+    public bool isActiveForPoints = false;
     public bool isActiveForSpreading = false;
 
     private void Start()
@@ -47,7 +47,10 @@ public class Node : MonoBehaviour
 
     private void Update()
     {
-        if (!isActiveForPoints || growthSystem == null) return;
+        if (!isActiveForPoints || growthSystem == null)
+        {
+            return;
+        }
 
         elapsedTime += Time.deltaTime;
 
@@ -83,7 +86,11 @@ public class Node : MonoBehaviour
 
     public void ReceivePoints(float points)
     {
-        if (!isActiveForPoints) return;
+        if (!isActiveForPoints)
+        {
+            return;
+        }
+        
         pointAccumulator += points;
     }
 }

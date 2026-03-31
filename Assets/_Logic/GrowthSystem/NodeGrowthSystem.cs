@@ -24,12 +24,14 @@ public class NodeGrowthSystem : MonoBehaviour
     {
         Node centralNode = InitializeCentralNode(Vector3Int.zero);
 
-        // Central node produces points immediately but cannot spread until clicked
         centralNode.isActiveForPoints = true;
         centralNode.isActiveForSpreading = false;
 
         Renderer rend = centralNode.GetComponentInChildren<Renderer>();
-        if (rend != null) rend.material.color = Color.gray;
+        if (rend != null)
+        {
+            rend.material.color = Color.gray;
+        }
     }
 
     public Node InitializeCentralNode(Vector3Int gridPos)
@@ -45,7 +47,10 @@ public class NodeGrowthSystem : MonoBehaviour
         occupiedCells.Add(gridPos);
 
         Renderer rend = centralNodeGO.GetComponentInChildren<Renderer>();
-        if (rend != null) rend.material.color = Color.gray;
+        if (rend != null)
+        {
+            rend.material.color = Color.gray;
+        }
 
         return centralNode;
     }
@@ -54,7 +59,9 @@ public class NodeGrowthSystem : MonoBehaviour
     {
         if (node.isActiveForSpreading)
         {
+#if UNITY_EDITOR
             Debug.Log("Node already active for spreading!");
+#endif
             return;
         }
 
@@ -65,13 +72,15 @@ public class NodeGrowthSystem : MonoBehaviour
             return;
         }
 
-        // Activate for spreading and points
         node.isActive = true;
         node.isActiveForSpreading = true;
         node.isActiveForPoints = true;
 
         Renderer rend = node.GetComponentInChildren<Renderer>();
-        if (rend != null) rend.material.color = Color.green;
+        if (rend != null)
+        {
+            rend.material.color = Color.green;
+        }
 
         SpawnNewNodes(node);
         UpdateConnectionMaterials();
@@ -98,7 +107,9 @@ public class NodeGrowthSystem : MonoBehaviour
         {
             Vector3Int neighbor = baseCell + offset;
             if (!occupiedCells.Contains(neighbor))
+            {
                 freeCells.Add(neighbor);
+            }
         }
 
         if (freeCells.Count == 0)
@@ -124,7 +135,6 @@ public class NodeGrowthSystem : MonoBehaviour
             newNode.depth = baseNode.depth + 1;
             baseNode.childNodes.Add(newNode);
 
-            // Assign efficiency randomly
             newNode.efficiencyType = (Random.value < 0.5f) ? NodeEfficiency.ShortTerm : NodeEfficiency.LongTerm;
 
             occupiedCells.Add(cellToSpawn);
@@ -135,7 +145,6 @@ public class NodeGrowthSystem : MonoBehaviour
                 rend.material.color = (newNode.efficiencyType == NodeEfficiency.ShortTerm) ? Color.red : Color.blue;
             }
 
-            // Create visual connection
             GameObject lineGO = new GameObject("ConnectionLine");
             LineRenderer lr = lineGO.AddComponent<LineRenderer>();
             lr.material = lineMaterial;
@@ -147,11 +156,8 @@ public class NodeGrowthSystem : MonoBehaviour
 
             connections.Add(new NodeConnection
             {
-                parentNode = baseNode,
-                childNode = newNode,
-                lineRenderer = lr
-            });
-        }
+                parentNode = baseNode, childNode = newNode, lineRenderer = lr} );
+            }
     }
 
     public void AddPoints(int amount)
